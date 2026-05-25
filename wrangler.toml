@@ -1,0 +1,37 @@
+name = "appdeck-feedback"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+# Workers free tier is plenty — the Worker is tiny + per-request fast.
+# At ~1k reports/day we'd still be well inside the 100k/day limit.
+
+# CORS: AppDeck talks to this Worker from a Tauri WebView. We allow any
+# origin because the Worker validates the payload shape and rate-limits
+# per IP anyway; restricting CORS wouldn't add real security.
+# (Tauri WebView's Origin header is unstable across platforms.)
+
+# ---------------------------------------------------------------------------
+# KV namespace — per-IP rate-limit counters
+# ---------------------------------------------------------------------------
+# Set up by running ONCE locally:
+#   wrangler kv:namespace create RATE_LIMIT_KV
+# Then paste the printed `id = "..."` value here, replacing the
+# placeholder below.
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# ---------------------------------------------------------------------------
+# Secrets — set via wrangler, NEVER committed
+# ---------------------------------------------------------------------------
+# GITHUB_TOKEN — fine-grained PAT scoped to issues:write on
+#                rozos1979/appdeck-feedback ONLY.
+#                Set via: wrangler secret put GITHUB_TOKEN
+#
+# To rotate (every 12 months): regenerate the PAT on GitHub, then
+#   wrangler secret put GITHUB_TOKEN
+# No code change required.
+
+[vars]
+# Public (non-secret) config values. Currently none, but here as
+# documentation of the convention if we add per-environment URLs etc.
+TARGET_REPO = "rozos1979/appdeck-feedback"
