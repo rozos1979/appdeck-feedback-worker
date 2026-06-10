@@ -1,37 +1,60 @@
-name = "appdeck-feedback"
+# v0.88.5 rename — worker renamed appdeck-feedback -> synaptodeck-feedback
+# to match the SynaptoDeck brand. New URL:
+#   https://synaptodeck-feedback.efthymioug.workers.dev
+#
+# This is deployed AS A NEW WORKER alongside the old appdeck-feedback
+# one (NOT a rename of the existing deployment). The old worker stays
+# live indefinitely so users on v0.88.0-4 keep getting their feedback
+# submitted. v0.88.5 (and forward) of the SynaptoDeck app point at
+# this new URL. Eventually-deprecate the old worker once v0.88.5+
+# install share is dominant.
+#
+# Re-deployment requirements:
+#   * Fine-grained PAT scoped to issues:write on synaptodeck/synaptodeck-feedback
+#     ONLY. Set via:  npx wrangler secret put GITHUB_TOKEN
+#   * cloudflare account: efthymioug (the workers.dev subdomain).
+name = "synaptodeck-feedback"
 main = "src/index.ts"
 compatibility_date = "2026-05-01"
 # Workers free tier is plenty — the Worker is tiny + per-request fast.
 # At ~1k reports/day we'd still be well inside the 100k/day limit.
 
-# CORS: AppDeck talks to this Worker from a Tauri WebView. We allow any
-# origin because the Worker validates the payload shape and rate-limits
-# per IP anyway; restricting CORS wouldn't add real security.
-# (Tauri WebView's Origin header is unstable across platforms.)
+# CORS: SynaptoDeck talks to this Worker from a Tauri WebView. We allow
+# any origin because the Worker validates the payload shape and
+# rate-limits per IP anyway; restricting CORS wouldn't add real
+# security. (Tauri WebView's Origin header is unstable across platforms.)
 
 # ---------------------------------------------------------------------------
 # KV namespace — per-IP rate-limit counters
 # ---------------------------------------------------------------------------
-# Set up by running ONCE locally:
-#   wrangler kv:namespace create RATE_LIMIT_KV
-# Then paste the printed `id = "..."` value here, replacing the
-# placeholder below.
+# v0.88.5 — Intentionally REUSING the existing KV namespace id from the
+# old appdeck-feedback worker. The KV holds nothing but rate-limit
+# counters (no PII; no message bodies). Reusing it means a user who
+# hammered the OLD worker can't bypass rate-limit by hitting the NEW
+# one a few seconds later — a small but real anti-abuse win. Cost: $0,
+# both workers share the same per-IP counters.
+#
+# To break the link (e.g. on a future major version), run
+#   npx wrangler kv:namespace create RATE_LIMIT_KV
+# and paste the new id here.
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "73abe82cecc34583a3b6193b60ef8b73"
 
 # ---------------------------------------------------------------------------
 # Secrets — set via wrangler, NEVER committed
 # ---------------------------------------------------------------------------
 # GITHUB_TOKEN — fine-grained PAT scoped to issues:write on
-#                rozos1979/appdeck-feedback ONLY.
-#                Set via: wrangler secret put GITHUB_TOKEN
+#                synaptodeck/synaptodeck-feedback ONLY.
+#                Set via: npx wrangler secret put GITHUB_TOKEN
 #
 # To rotate (every 12 months): regenerate the PAT on GitHub, then
-#   wrangler secret put GITHUB_TOKEN
+#   npx wrangler secret put GITHUB_TOKEN
 # No code change required.
 
 [vars]
-# Public (non-secret) config values. Currently none, but here as
-# documentation of the convention if we add per-environment URLs etc.
-TARGET_REPO = "rozos1979/appdeck-feedback"
+# Public (non-secret) config values. The Worker reads TARGET_REPO at
+# request time to know which GitHub repo to file issues into. Changing
+# this value DOES NOT require a redeploy of the Worker code — just an
+# `npx wrangler deploy` to push the [vars] update.
+TARGET_REPO = "synaptodeck/synaptodeck-feedback"
